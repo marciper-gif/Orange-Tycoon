@@ -114,6 +114,7 @@
       <button data-speed="4" class="speed-btn px-2 py-1 rounded-lg text-xs font-bold bg-slate-700/70 hover:bg-slate-600 transition" title="Velocidade 4x">4x</button>
       <div class="w-px h-5 bg-white/15 mx-0.5"></div>
       <button id="btn-mute" class="px-2 py-1 rounded-lg text-xs font-bold bg-slate-700/70 hover:bg-slate-600 transition" title="Som Ligado/Desligado">🔊</button>
+      <button id="btn-save" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/25 hover:bg-emerald-500/40 text-emerald-200 border border-emerald-400/30 transition" title="Salvar Progresso">💾 Salvar</button>
       <button id="btn-help" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/25 hover:bg-amber-500/40 text-amber-200 border border-amber-400/30 transition" title="Primeiros Passos / Como Jogar">❓ Guia</button>
     </div>
   </header>
@@ -163,7 +164,10 @@
       <button data-tab="finance" class="nav-tab pixar-btn px-3 py-2 rounded-xl bg-slate-700/80 hover:bg-slate-600 text-slate-100 text-xs sm:text-sm font-semibold whitespace-nowrap flex items-center gap-1.5">
         💰 <span>Financeiro</span>
       </button>
-      <button data-tab="holding" class="nav-tab pixar-btn px-3 py-2 rounded-xl bg-slate-700/80 hover:bg-slate-600 text-slate-100 text-xs sm:text-sm font-semibold whitespace-nowrap flex items-center gap-1.5">
+      <button data-tab="team" class="nav-tab pixar-btn px-3 py-2 rounded-xl bg-slate-700/80 hover:bg-slate-600 text-slate-100 text-xs sm:text-sm font-semibold whitespace-nowrap flex items-center gap-1.5">
+        👥 <span>Equipe & Diretoria</span>
+      </button>
+            <button data-tab="holding" class="nav-tab pixar-btn px-3 py-2 rounded-xl bg-slate-700/80 hover:bg-slate-600 text-slate-100 text-xs sm:text-sm font-semibold whitespace-nowrap flex items-center gap-1.5">
         🏛️ <span>Holding & M&A</span>
       </button>
     </div>
@@ -201,9 +205,14 @@
         <div>⌨️ <strong>WASD / Setas:</strong> Mover câmera</div>
         <div>🎬 <strong>Cenas 3D:</strong> Colheita, Navio & M&A</div>
       </div>
-      <button id="btn-start-game" class="pixar-btn w-full py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-display font-bold text-lg pulse-orange">
-        Iniciar Império Cítrico 🚀
-      </button>
+      <div class="space-y-2">
+        <button id="btn-load-game" class="pixar-btn w-full py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-display font-bold text-base hidden">
+          📂 Continuar Jogo Salvo
+        </button>
+        <button id="btn-start-game" class="pixar-btn w-full py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-display font-bold text-lg pulse-orange">
+          Iniciar Império Cítrico 🚀
+        </button>
+      </div>
     </div>
   </div>
 
@@ -402,6 +411,21 @@ const STATE = {
     lastDre: { revExport: 0, revDomestic: 0, revSub: 0, costRaw: 0, costLogistics: 0, costOpex: 0, costInterest: 0, netProfit: 0 }
   },
 
+  // Staff: Factory Workers, Management, Executive Board
+  staff: {
+    factoryWorkers: 4, // +25 t/month capacity & +0.5% efficiency each
+    managers: {
+      industrial: false,  // Auto-balances mix for active contracts
+      logistics: false,   // -15% logistics cost & +15% truck capacity
+      commercial: false   // Auto-renews best export offers when slots < 2
+    },
+    directors: {
+      cfo: false, // Auto-hedges USD >= 5.30 & reduces debt interest by 25%
+      coo: false, // Auto-buys 60t spot oranges on frost/drought if inventory low
+      ma: false   // -10% cost on subsidiaries & M&A acquisitions
+    }
+  },
+
   // Milestone flags for key-moment cutscenes
   cutsceneFlags: {
     firstHarvest: false,
@@ -467,9 +491,9 @@ generateOffers();
 const Scene3D = (() => {
   const canvas = document.getElementById('game-canvas');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.12;
 
@@ -516,7 +540,7 @@ const Scene3D = (() => {
   const sunLight = new THREE.DirectionalLight('#fff2d6', 1.35);
   sunLight.position.set(48, 65, 36);
   sunLight.castShadow = true;
-  sunLight.shadow.mapSize.set(2048, 2048);
+  sunLight.shadow.mapSize.set(1024, 1024);
   sunLight.shadow.camera.near = 10;
   sunLight.shadow.camera.far = 180;
   const d = 65;
@@ -574,13 +598,13 @@ const Scene3D = (() => {
       trunk.castShadow = true;
       tree.add(trunk);
 
-      const c1 = new THREE.Mesh(new THREE.SphereGeometry(2.3, 16, 14), treeCanopyMat);
+      const c1 = new THREE.Mesh(new THREE.SphereGeometry(2.3, 9, 8), treeCanopyMat);
       c1.position.y = 3.6;
       c1.castShadow = true;
       c1.receiveShadow = true;
       tree.add(c1);
 
-      const c2 = new THREE.Mesh(new THREE.SphereGeometry(1.6, 14, 12), mat('#4db344', 0.72));
+      const c2 = new THREE.Mesh(new THREE.SphereGeometry(1.6, 8, 7), mat('#4db344', 0.72));
       c2.position.set(0.9, 4.3, 0.6);
       c2.castShadow = true;
       tree.add(c2);
@@ -653,10 +677,10 @@ const Scene3D = (() => {
 
   const steamPuffs = [];
   const steamMat = new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.65, roughness: 1 });
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 5; i++) {
     const puff = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 10), steamMat.clone());
     puff.position.set(9, 14.5 + i * 0.9, -7);
-    puff.userData.life = i / 12;
+    puff.userData.life = i / 5;
     scene.add(puff);
     steamPuffs.push(puff);
   }
@@ -774,7 +798,7 @@ const Scene3D = (() => {
 
   const clouds = [];
   const cloudMat = mat('#ffffff', 0.95);
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 4; i++) {
     const cg = new THREE.Group();
     for (let j = 0; j < 3; j++) {
       const b = new THREE.Mesh(new THREE.SphereGeometry(2.5 + j * 0.6, 12, 10), cloudMat);
@@ -813,7 +837,7 @@ const Scene3D = (() => {
 
   function startCutscene(type, title, desc, tag = 'Momento Chave') {
     if (activeCutscene) endCutscene();
-    activeCutscene = { type, t: 0, duration: 4.8 };
+    activeCutscene = { type, t: 0, duration: 3.2 };
     csTitle.textContent = title;
     csDesc.textContent = desc;
     csTag.textContent = tag;
@@ -838,7 +862,7 @@ const Scene3D = (() => {
       camCtrl.desiredTheta = 0.6;
       camCtrl.desiredPhi = 1.02;
       camCtrl.desiredDist = 38;
-      spawnParticles(new THREE.Vector3(18, 14, -18), '#fbbf24', 36, 12, 10);
+      spawnParticles(new THREE.Vector3(18, 14, -18), '#fbbf24', 14, 10, 8);
     } else if (type === 'weather') {
       AudioFX.alert();
       camCtrl.desiredTarget.set(-34, 4, 4);
@@ -959,8 +983,8 @@ const Scene3D = (() => {
         bulkTruck.rotation.y = Math.PI;
         const tilt = Math.sin(Math.min(1, activeCutscene.t / 1.8) * Math.PI) * 0.55;
         bulkTruck.userData.bed.rotation.z = -tilt;
-        if (Math.random() < 0.45 && activeCutscene.t < 3.2) {
-          spawnParticles(new THREE.Vector3(2.2, 2.5, 4), '#ff7b00', 2, 2.2, 3.5);
+        if (Math.random() < 0.2 && activeCutscene.t < 2.2) {
+          spawnParticles(new THREE.Vector3(2.2, 2.5, 4), '#ff7b00', 1, 2.0, 3.0);
         }
       } else if (activeCutscene.type === 'export') {
         ship.position.x = 10 + activeCutscene.t * 4.5;
@@ -1053,7 +1077,8 @@ function advanceMonth() {
   if (STATE.importedFertilizerMonths > 0) STATE.importedFertilizerMonths--;
   const totalHectares = STATE.hectares + (STATE.subsidiaries.megaFarm.owned ? 250 : 0);
   const potentialHarvest = Math.round(totalHectares * 2.1 * weatherMult * fertMult);
-  const bulkCap = STATE.bulkTrucks * 95 + (STATE.subsidiaries.transport.owned ? 250 : 0);
+  const logMgrMult = STATE.staff.managers.logistics ? 1.15 : 1.0;
+  const bulkCap = Math.round((STATE.bulkTrucks * 95 + (STATE.subsidiaries.transport.owned ? 250 : 0)) * logMgrMult);
   const harvested = Math.min(potentialHarvest, bulkCap);
   STATE.invOranges = Math.min(STATE.storageCapacity, STATE.invOranges + harvested);
 
@@ -1062,9 +1087,34 @@ function advanceMonth() {
     Scene3D.startCutscene('harvest', 'Safra Chegando na Moega!', `${harvested} toneladas de laranja Pera/Valência descarregadas na fábrica.`, 'Logística & Colheita');
   }
 
-  const toProcess = Math.min(STATE.invOranges, STATE.factoryCapacity);
+  // Management & Board automated decisions
+  if (STATE.staff.managers.industrial && STATE.contracts.length > 0) {
+    const firstProd = STATE.contracts[0].product;
+    if (firstProd === 'FCOJ') { STATE.mixFcoj = 70; STATE.mixNfc = 20; STATE.mixSub = 10; }
+    else if (firstProd === 'NFC') { STATE.mixFcoj = 30; STATE.mixNfc = 60; STATE.mixSub = 10; }
+  }
+  if (STATE.staff.directors.coo && (STATE.weather === 'frost' || STATE.weather === 'drought') && STATE.invOranges < 120 && STATE.cash > STATE.spotOrangePriceBrl * 60) {
+    STATE.cash -= STATE.spotOrangePriceBrl * 60;
+    STATE.invOranges = Math.min(STATE.storageCapacity, STATE.invOranges + 60);
+    showToast('👔 COO comprou 60t spot para proteger a produção!', 'info');
+  }
+  if (STATE.staff.directors.cfo && STATE.hedgeMonths === 0 && STATE.usdBrl >= 5.30 && STATE.cash >= 150000) {
+    STATE.cash -= 150000;
+    STATE.hedgeMonths = 6;
+    STATE.hedgedUsdRate = STATE.usdBrl;
+    showToast(`👔 CFO travou câmbio em R$ ${STATE.usdBrl.toFixed(2)}!`, 'info');
+  }
+  if (STATE.staff.managers.commercial && STATE.contracts.length < 2 && STATE.availableOffers.length > 0) {
+    const best = STATE.availableOffers.shift();
+    STATE.contracts.push(best);
+    showToast(`👔 Gerente Comercial fechou contrato: ${best.buyer}!`, 'success');
+  }
+
+  const effCap = STATE.factoryCapacity + STATE.staff.factoryWorkers * 25;
+  const effRate = Math.min(0.62, STATE.extractionEfficiency + STATE.staff.factoryWorkers * 0.005);
+  const toProcess = Math.min(STATE.invOranges, effCap);
   STATE.invOranges -= toProcess;
-  const totalJuice = toProcess * STATE.extractionEfficiency;
+  const totalJuice = toProcess * effRate;
   const fcojOut = +(totalJuice * (STATE.mixFcoj / 100) * 0.45).toFixed(1);
   const nfcOut = +(totalJuice * (STATE.mixNfc / 100)).toFixed(1);
   const subOut = +(toProcess * (STATE.mixSub / 100) * 0.18 * (STATE.subsidiaries.bioRefinery.owned ? 2 : 1)).toFixed(1);
@@ -1079,7 +1129,7 @@ function advanceMonth() {
   const effectiveUsd = STATE.hedgeMonths > 0 ? STATE.hedgedUsdRate : STATE.usdBrl;
   if (STATE.hedgeMonths > 0) STATE.hedgeMonths--;
 
-  let tankerCap = STATE.tankerTrucks * 75 + (STATE.subsidiaries.transport.owned ? 220 : 0);
+  let tankerCap = Math.round((STATE.tankerTrucks * 75 + (STATE.subsidiaries.transport.owned ? 220 : 0)) * logMgrMult);
   let revExport = 0;
 
   for (let i = STATE.contracts.length - 1; i >= 0; i--) {
@@ -1132,9 +1182,13 @@ function advanceMonth() {
   const subIncome = Object.values(STATE.subsidiaries).filter(s => s.owned).reduce((a, b) => a + b.income, 0);
   const maDividends = STATE.competitors.reduce((a, c) => a + Math.round((c.ownedPct / 100) * c.price * 0.028), 0);
 
-  const costLogistics = (STATE.bulkTrucks * 18000 + STATE.tankerTrucks * 24000) * (STATE.subsidiaries.transport.owned ? 0.55 : 1);
-  const costOpex = STATE.hectares * 650 + STATE.factoryCapacity * 380 + (STATE.holdingFormed ? 95000 : 0);
-  const costInterest = Math.round(STATE.debt * STATE.selicRate);
+  const logDiscount = (STATE.subsidiaries.transport.owned ? 0.55 : 1) * (STATE.staff.managers.logistics ? 0.85 : 1);
+  const costLogistics = (STATE.bulkTrucks * 18000 + STATE.tankerTrucks * 24000) * logDiscount;
+  const mgrCount = Object.values(STATE.staff.managers).filter(Boolean).length;
+  const dirCount = Object.values(STATE.staff.directors).filter(Boolean).length;
+  const payroll = STATE.staff.factoryWorkers * 4800 + mgrCount * 22000 + dirCount * 48000;
+  const costOpex = STATE.hectares * 650 + STATE.factoryCapacity * 380 + payroll + (STATE.holdingFormed ? 95000 : 0);
+  const costInterest = Math.round(STATE.debt * STATE.selicRate * (STATE.staff.directors.cfo ? 0.75 : 1));
   const totalRev = Math.round(revExport + revDomestic + revSub + subIncome + maDividends);
   const totalCost = Math.round(costLogistics + costOpex + costInterest);
   const netProfit = totalRev - totalCost;
@@ -1168,6 +1222,7 @@ function advanceMonth() {
     openVictoryModal();
   }
 
+  if (STATE.month % 3 === 0) saveGame(true);
   updateHUD();
   if (STATE.activeTab) renderDrawer(STATE.activeTab);
 }
@@ -1423,6 +1478,73 @@ function renderDrawer(tab) {
         options: { maintainAspectRatio: false, plugins: { legend: { labels: { color: '#e2e8f0', font: { size: 10 } } } }, scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8' } } } }
       });
     }, 30);
+  } else if (tab === 'team') {
+    titleEl.textContent = '👥 Equipe: Fábrica, Gerência & Diretoria';
+    const effCap = STATE.factoryCapacity + STATE.staff.factoryWorkers * 25;
+    const effRate = Math.min(62, Math.round((STATE.extractionEfficiency + STATE.staff.factoryWorkers * 0.005) * 100));
+    const mgrCount = Object.values(STATE.staff.managers).filter(Boolean).length;
+    const dirCount = Object.values(STATE.staff.directors).filter(Boolean).length;
+    const payroll = STATE.staff.factoryWorkers * 4800 + mgrCount * 22000 + dirCount * 48000;
+
+    body.innerHTML = `
+      <div class="bg-slate-800/70 p-3.5 rounded-2xl border border-white/10 flex flex-wrap justify-between items-center gap-2">
+        <div>
+          <div class="text-xs uppercase text-slate-400 font-bold">Operários & Técnicos de Fábrica</div>
+          <div class="text-lg font-display font-bold text-amber-300">${STATE.staff.factoryWorkers} funcionários • Cap. Efetiva: ${effCap} t/mês (${effRate}%)</div>
+          <div class="text-[11px] text-slate-300">Cada técnico adiciona +25 t/mês de moagem e +0,5% de rendimento (Salário: R$ 4.8k/mês).</div>
+        </div>
+        <button onclick="actHireWorker()" class="pixar-btn px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-xs font-bold whitespace-nowrap">
+          +1 Técnico (R$ 45k)
+        </button>
+      </div>
+
+      <div class="space-y-2">
+        <div class="text-xs uppercase font-bold text-sky-300">Gerência (Organização & Automação — R$ 22k/mês cada)</div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <button onclick="actHireRole('managers','industrial',180000)" ${STATE.staff.managers.industrial ? 'disabled' : ''} class="pixar-btn p-3 rounded-xl bg-slate-800 border border-sky-400/30 text-left">
+            <div class="font-bold text-xs text-sky-300">⚙️ Gerente Industrial</div>
+            <div class="text-[11px] text-slate-300 mt-1">Ajusta o mix da fábrica automaticamente para priorizar contratos ativos.</div>
+            <div class="text-xs font-bold text-amber-300 mt-1.5">${STATE.staff.managers.industrial ? 'Contratado ✓' : 'R$ 180k'}</div>
+          </button>
+          <button onclick="actHireRole('managers','logistics',180000)" ${STATE.staff.managers.logistics ? 'disabled' : ''} class="pixar-btn p-3 rounded-xl bg-slate-800 border border-sky-400/30 text-left">
+            <div class="font-bold text-xs text-sky-300">🚛 Gerente Logístico</div>
+            <div class="text-[11px] text-slate-300 mt-1">Reduz custo de frota em 15% e amplia capacidade dos caminhões em +15%.</div>
+            <div class="text-xs font-bold text-amber-300 mt-1.5">${STATE.staff.managers.logistics ? 'Contratado ✓' : 'R$ 180k'}</div>
+          </button>
+          <button onclick="actHireRole('managers','commercial',200000)" ${STATE.staff.managers.commercial ? 'disabled' : ''} class="pixar-btn p-3 rounded-xl bg-slate-800 border border-sky-400/30 text-left">
+            <div class="font-bold text-xs text-sky-300">🤝 Gerente Comercial</div>
+            <div class="text-[11px] text-slate-300 mt-1">Assina novas propostas de exportação automaticamente quando houver espaço.</div>
+            <div class="text-xs font-bold text-amber-300 mt-1.5">${STATE.staff.managers.commercial ? 'Contratado ✓' : 'R$ 200k'}</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <div class="text-xs uppercase font-bold text-purple-300">Diretoria Executiva (Decisões Estratégicas Conjuntas — R$ 48k/mês cada)</div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <button onclick="actHireRole('directors','cfo',450000)" ${STATE.staff.directors.cfo ? 'disabled' : ''} class="pixar-btn p-3 rounded-xl bg-slate-800 border border-purple-400/30 text-left">
+            <div class="font-bold text-xs text-purple-300">💼 CFO (Financeiro)</div>
+            <div class="text-[11px] text-slate-300 mt-1">Corta juros da dívida em 25% e faz Hedge automático se dólar ≥ R$ 5,30.</div>
+            <div class="text-xs font-bold text-amber-300 mt-1.5">${STATE.staff.directors.cfo ? 'No Conselho ✓' : 'R$ 450k'}</div>
+          </button>
+          <button onclick="actHireRole('directors','coo',450000)" ${STATE.staff.directors.coo ? 'disabled' : ''} class="pixar-btn p-3 rounded-xl bg-slate-800 border border-purple-400/30 text-left">
+            <div class="font-bold text-xs text-purple-300">🏭 COO (Operações)</div>
+            <div class="text-[11px] text-slate-300 mt-1">Compra 60t de laranja spot automaticamente em geadas/secas para não parar.</div>
+            <div class="text-xs font-bold text-amber-300 mt-1.5">${STATE.staff.directors.coo ? 'No Conselho ✓' : 'R$ 450k'}</div>
+          </button>
+          <button onclick="actHireRole('directors','ma',550000)" ${STATE.staff.directors.ma ? 'disabled' : ''} class="pixar-btn p-3 rounded-xl bg-slate-800 border border-purple-400/30 text-left">
+            <div class="font-bold text-xs text-purple-300">🏛️ Diretor de M&A</div>
+            <div class="text-[11px] text-slate-300 mt-1">Negocia aquisições e reduz em 10% o custo de subsidiárias e concorrentes.</div>
+            <div class="text-xs font-bold text-amber-300 mt-1.5">${STATE.staff.directors.ma ? 'No Conselho ✓' : 'R$ 550k'}</div>
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/60 p-3 rounded-xl border border-white/10 text-xs flex justify-between items-center">
+        <span class="text-slate-300">Folha Salarial Mensal Total:</span>
+        <span class="font-display font-bold text-rose-300">${formatBRL(payroll)} / mês</span>
+      </div>
+    `;
   } else if (tab === 'holding') {
     titleEl.textContent = '🏛️ Holding, Subsidiárias & Aquisições (M&A)';
     const subsHtml = Object.entries(STATE.subsidiaries).map(([k, s]) => `
@@ -1607,7 +1729,8 @@ window.actFormHolding = () => {
 
 window.actBuySub = (key) => {
   const s = STATE.subsidiaries[key];
-  if (!s || s.owned || !spend(s.cost)) return;
+  const mult = STATE.staff.directors.ma ? 0.9 : 1;
+  if (!s || s.owned || !spend(Math.round(s.cost * mult))) return;
   s.owned = true;
   closeDrawer();
   Scene3D.startCutscene('holding', `Nova Subsidiária: ${s.name}`, s.desc, 'Expansão da Holding');
@@ -1617,13 +1740,60 @@ window.actBuySub = (key) => {
 window.actBuyCompetitor = (id) => {
   const c = STATE.competitors.find(x => x.id === id);
   if (!c || c.ownedPct >= 100) return;
-  const cost = Math.round(c.price * 0.25);
+  const cost = Math.round(c.price * 0.25 * (STATE.staff.directors.ma ? 0.9 : 1));
   if (!spend(cost)) return;
   c.ownedPct = Math.min(100, c.ownedPct + 25);
   AudioFX.fanfare();
   showToast(`🤝 +25% da ${c.name} adquiridos! Participação atual: ${c.ownedPct}%`, 'success');
   updateHUD(); renderDrawer('holding');
 };
+
+window.actHireWorker = () => {
+  if (!spend(45000)) return;
+  STATE.staff.factoryWorkers++;
+  AudioFX.cash();
+  showToast('👷 Novo técnico contratado! Capacidade +25 t/mês.', 'success');
+  updateHUD(); renderDrawer('team');
+};
+
+window.actHireRole = (group, role, cost) => {
+  if (STATE.staff[group][role] || !spend(cost)) return;
+  STATE.staff[group][role] = true;
+  AudioFX.fanfare();
+  showToast('👔 Novo executivo integrado à equipe!', 'success');
+  updateHUD(); renderDrawer('team');
+};
+
+const SAVE_KEY = 'laranja_imperio_3d_save_v1';
+
+function saveGame(silent = false) {
+  try {
+    const payload = JSON.stringify(STATE);
+    localStorage.setItem(SAVE_KEY, payload);
+    if (!silent) {
+      AudioFX.cash();
+      showToast('💾 Jogo salvo com sucesso no navegador!', 'success');
+    }
+  } catch (e) {
+    if (!silent) showToast('⚠️ Não foi possível salvar localmente.', 'warn');
+  }
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    Object.assign(STATE, saved);
+    STATE.started = true;
+    STATE.activeTab = null;
+    updateHUD();
+    showToast(`📂 Bem-vindo de volta à ${STATE.companyName}!`, 'success');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 function openVictoryModal() {
   const overlay = document.getElementById('modal-overlay');
@@ -1722,7 +1892,25 @@ document.getElementById('btn-start-game').addEventListener('click', () => {
   }
 });
 
+document.getElementById('btn-save').addEventListener('click', () => {
+  AudioFX.unlock();
+  saveGame(false);
+});
+
+document.getElementById('btn-load-game').addEventListener('click', () => {
+  AudioFX.unlock();
+  AudioFX.fanfare();
+  if (loadGame()) {
+    document.getElementById('modal-overlay').classList.add('hidden');
+  }
+});
+
 window.onload = () => {
+  try {
+    if (localStorage.getItem(SAVE_KEY)) {
+      document.getElementById('btn-load-game').classList.remove('hidden');
+    }
+  } catch (e) {}
   updateHUD();
   let lastSim = performance.now();
   function simLoop(now) {
